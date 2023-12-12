@@ -7,66 +7,52 @@ set -ex
 apt update
 # apt upgrade -y
 
+# Descargar herramienta unzip
+apt install unzip
+
 # Variables de entorno
 source .env
 
 # Borrar instalaciones previas
-rm -rf /tmp/wp-cli.phar
-
-# rm -rf /var/www/html/*
-# rm -rf /tmp/wordpress/*
-
-# Descargar la herramienta wp-cli
-wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -P /tmp
-
-# Asignar permisos de ejecución
-chmod +x /tmp/wp-cli.phar
-
-# Mover el archivo a /usr/local/bin
-mv /tmp/wp-cli.phar /usr/local/bin/wp
-
-# Borrar instalaciones previas de WordPress
+rm -rf /tmp/v4.3.1.zip
 rm -rf /var/www/html/*
+rm -rf /tmp/moodle-4.3.1
+rm -rf /var/www/moodledata
 
-# Descargar código fuente de WordPress
-wp core download \
-  --locale=es_ES \
-  --path=/var/www/html \
-  --allow-root
+# Descargar el zip de Moodle
+wget https://github.com/moodle/moodle/archive/refs/tags/v4.3.1.zip -P /tmp
 
-# Configurar WordPress
-wp config create \
-  --dbname=$WORDPRESS_DB_NAME \
-  --dbuser=$WORDPRESS_DB_USER \
-  --dbpass=$WORDPRESS_DB_PASSWORD \
-  --dbhost=$WORDPRESS_DB_HOST \
-  --path=/var/www/html \
-  --allow-root
+# Descomprimir el zip de Moodle en la carpeta tmp
+unzip /tmp/v4.3.1.zip -d /tmp
 
-# Instalar WordPress
-wp core install \
-  --url=$CERTIFICATE_DOMAIN \
-  --title="$WORDPRESS_TITLE" \
-  --admin_user=$WORDPRESS_ADMIN_USER \
-  --admin_password=$WORDPRESS_ADMIN_PASS \
-  --admin_email=$CERTIFICATE_EMAIL \
-  --path=/var/www/html \
-  --allow-root  
+# Crear una carpeta para los datos de moodle por seguridad
+mkdir /var/www/moodledata
 
-# Instalación del plugin Permalink Manager Lite para los enlaces permanentes.
-wp --path=/var/www/html plugin install permalink-manager --activate --allow-root
-# Configurar la estructura de enlaces permanentes después de la instalación completa de WordPress
-wp --path=/var/www/html option update permalink_structure '/%postname%/' --allow-root
+# Dar permisos a la carpeta
+chmod 777 /var/www/moodledata
 
-# Instalar un tema en WordPress
-wp theme install emart-shop --activate --path=/var/www/html --allow-root
+# Mover los archivos de la carpeta moodle al directorio html
+mv -f /tmp/moodle-4.3.1/* /var/www/html
 
-# Instalar un plugin para modificar la ruta de wp-admin
-wp plugin install wps-hide-login --activate --path=/var/www/html --allow-root
-wp option update whl_page "inicio" --path=/var/www/html --allow-root
+# Instalación de Moodle
+sudo -u www-data php /var/www/html/admin/cli/install.php \
+        --lang=$MOODLE_LANG \
+        --wwwroot=$MOODLE_WWWROOT \
+        --dataroot=$MOODLE_DATAROOT \
+        --dbtype=$MOODLE_DB_TYPE \
+        --dbhost=$MOODLE_DB_HOST \
+        --dbname=$MOODLE_DB_NAME \
+        --dbuser=$MOODLE_DB_USER \
+        --dbpass=$MOODLE_DB_PASS \
+        --fullname="$MOODLE_FULLNAME" \
+        --shortname="$MOODLE_SHORTNAME" \
+        --summary="$MOODLE_SUMMARY" \
+        --adminuser=$MOODLE_ADMIN_USER \
+        --adminpass=$MOODLE_ADMIN_PASS \
+        --adminemail=$MOODLE_ADMIN_EMAIL \
+        --non-interactive \
+        --agree-license
 
-# Eliminar los temas que estén inactivos
-wp theme delete $(wp theme list --status=inactive --field=name --path=/var/www/html --allow-root) --path=/var/www/html --allow-root
 
 # Copiar archivo htaccess
 cp -f ../htaccess/.htaccess /var/www/html
